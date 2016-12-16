@@ -15,7 +15,8 @@ class MNISTDataSet:
             self.getSlice('train', dsrange)
         
     def plotDigit(self, adigit, nvals=False):
-        #plots a digit
+        '''plots a digit. If nvals is true, then it uses a colormap to 
+        distinguish negative and positive values.'''
         adigit=adigit.reshape(28,28)
         if nvals is True:
             plt.imshow(adigit,cmap="RdBu")
@@ -24,7 +25,7 @@ class MNISTDataSet:
         plt.show()
         
     def plotIdx(self, idx):
-        #plots a digit at the specified index in training set
+        '''plots a digit at the specified index in training set'''
         y = sp.reshape(self.train[0][idx], (28,28))
         plt.imshow(y, cmap = 'Greys')
         plt.show()
@@ -98,6 +99,9 @@ class MNISTClassifierBase():
         stoc_grad = dotprod*u
         if bound == True:
             len_vec = sp.sqrt(sp.diagonal(sp.dot(stoc_grad, sp.transpose(stoc_grad))))
+            bool_list = list(map(lambda z: z>10, len_vec))
+            bool_array = sp.array(bool_list, dtype = int)
+            norm_factor = sp.divide(bool_array, float(m)*len_vec)
             for i in range(len(len_vec)): #this for loop is small as len_vec len is 10
                 if len_vec[i] > 10:
                     stoc_grad[i,:] = stoc_grad[i,:]/(float(m)*float(len_vec[i]))
