@@ -99,12 +99,19 @@ class MNISTClassifierBase():
         stoc_grad = dotprod*u
         if bound == True:
             len_vec = sp.sqrt(sp.diagonal(sp.dot(stoc_grad, sp.transpose(stoc_grad))))
+            #creating the list where len_vec is greater than desired value
             bool_list = list(map(lambda z: z>10, len_vec))
+            #converting boolean list to array of 1 0
             bool_array = sp.array(bool_list, dtype = int)
+            #calculating factor to be divided with
             norm_factor = sp.divide(bool_array, float(m)*len_vec)
+            norm_factor[norm_factor == 0] = 1 #replacing 0's with 1
+            temp_norm = sp.reshape(norm_factor, (len(norm_factor),1))*sp.ones(sp.shape(stoc_grad))
+            stoc_grad = sp.divide(stoc_grad, temp_norm)
+            '''alternatively we can use this
             for i in range(len(len_vec)): #this for loop is small as len_vec len is 10
                 if len_vec[i] > 10:
-                    stoc_grad[i,:] = stoc_grad[i,:]/(float(m)*float(len_vec[i]))
+                    stoc_grad[i,:] = stoc_grad[i,:]/(float(m)*float(len_vec[i]))'''
         return stoc_grad
         
     def classify(self, x, data1):
