@@ -5,41 +5,35 @@ from collections import deque
 
 class MNISTDataSet:
     def __init__(self, dsrange = None):
+        '''Reads in the data file. dsrange is a slice object. If
+        dsrange is not None returns we drop every thing from the 
+        training set other than that slice.'''
         f = gzip.open('mnist.pkl.gz', 'rb')
         self.train, self.validation, self.test = cPickle.load(f)
         f.close()
         if dsrange != None:
-            self.getSlice('test', dsrange)
+            self.getSlice('train', dsrange)
         
     def plotDigit(self, adigit, nvals=False):
+        #plots a digit
         adigit=adigit.reshape(28,28)
         if nvals is True:
-            plt.imshow(adigit,cmap="Greys")
+            plt.imshow(adigit,cmap="RdBu")
         else:
             plt.imshow(adigit,cmap="Greys")
         plt.show()
         
     def plotIdx(self, idx):
+        #plots a digit at the specified index in training set
         y = sp.reshape(self.train[0][idx], (28,28))
         plt.imshow(y, cmap = 'Greys')
         plt.show()
         
     def getSlice(self, dsname, aslice):
-        if dsname is 'train':
-            self.train = list(self.train)
-            self.train[0] = self.train[0][aslice]
-            self.train[1] = self.train[1][aslice]
-            self.train = tuple(self.train)
-        if dsname is 'validation':
-            self.validation = list(self.validation)
-            self.validation[0] = self.validation[0][aslice]
-            self.validation[1] = self.validation[1][aslice]
-            self.validation = tuple(self.validation)
-        if dsname is 'test':
-            self.test = list(self.test)
-            self.test[0] = self.test[0][aslice]
-            self.test[1] = self.test[1][aslice]
-            self.test = tuple(self.test)
+        getattr(self, dsname) = list(getattr(self, dsname))
+        getattr(self, dsname)[0] = getattr(self, dsname)[0][aslice]
+        getattr(self, dsname)[1] = getattr(self, dsname)[1][aslice]
+        getattr(self, dsname) = tuple(getattr(self, dsname)
             
 class MNISTClassifierBase():
     def __init__(self, ds = None):
