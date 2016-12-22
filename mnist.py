@@ -34,9 +34,9 @@ class MNISTDataSet:
         getattr(self, dsname) = list(getattr(self, dsname))
         getattr(self, dsname)[0] = getattr(self, dsname)[0][aslice]
         getattr(self, dsname)[1] = getattr(self, dsname)[1][aslice]
-        getattr(self, dsname) = tuple(getattr(self, dsname)
+        getattr(self, dsname) = tuple(getattr(self, dsname))
             
-class MNISTClassifierBase():
+class MNISTClassifierBase:
     def __init__(self, ds = None):
         '''ds should always be a MNISTDataSet object'''
         self.data = MNISTDataSet()
