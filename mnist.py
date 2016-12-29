@@ -2,6 +2,7 @@ import cPickle, gzip
 import scipy as sp
 import matplotlib.pyplot as plt
 from collections import deque 
+import scipy.ndimage as sn
 
 class MNISTDataSet:
     def __init__(self, dsrange = None):
@@ -31,10 +32,11 @@ class MNISTDataSet:
         plt.show()
         
     def getSlice(self, dsname, aslice):
-        getattr(self, dsname) = list(getattr(self, dsname))
+        '''used setattr() to assign values to attributes'''
+        setattr(self, dsname, list(getattr(self, dsname)))
         getattr(self, dsname)[0] = getattr(self, dsname)[0][aslice]
         getattr(self, dsname)[1] = getattr(self, dsname)[1][aslice]
-        getattr(self, dsname) = tuple(getattr(self, dsname))
+        setattr(self, dsname, tuple(getattr(self, dsname)))
             
 class MNISTClassifierBase:
     def __init__(self, ds = None):
@@ -137,8 +139,7 @@ class MNISTSqloss(MNISTClassifierBase):
         func evaluation and gradient evaluation (funcEval etc.) '''
         temp = sp.vstack((getattr(self, str_name), self.x_temp[n, :]))
         setattr(self, str_name, temp)
-        
-        
+              
     def funcEval(self, x, data1):
         '''assuming x as a 10X784 matrix and every element in x is a float
         data is a tuple of pixel vectors and its label or what no the vector 
@@ -305,17 +306,19 @@ class SGD:
             self.f_new = self.getAvgSoln()
 
         return self.history_f[len(self.history_f) -1]
-        
-if __name__ == '__main__':
-    import timeit
-    from matplotlib import pylab
-    start = timeit.default_timer()
-    func = MNISTMultiNom()
-    #func1 = MNISTSqloss()
-    x0 = sp.random.randn(10,784)
-    solution = SGD(func, x0, 100, 0.9)
-    solution.getSoln()
-    w = solution.history_x.pop()
+
+#==============================================================================
+# if __name__ == '__main__':
+#     import timeit
+#     from matplotlib import pylab
+#     start = timeit.default_timer()
+#     func = MNISTMultiNom()
+#     #func1 = MNISTSqloss()
+#     x0 = sp.random.randn(10,784)
+#     solution = SGD(func, x0, 100, 0.9)
+#     solution.getSoln()
+#     w = solution.history_x.pop()
+#==============================================================================
     
 #algorithm is taking lot of minutes(approx 5 mins) to converge and classification 
 #errors are in range of 80 to 90 for both classifiers with multinomial performing better
