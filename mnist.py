@@ -129,35 +129,74 @@ class MNISTSqloss(MNISTClassifierBase):
     def classify(self, x, data1):
         '''for every point its distance from the parameters is calculated and 
         argmin of the array is returned'''
-        result = []
-        for i in range(len(data1[1])):
-            temp = sp.square(x - data1[0][i]).sum(axis = 1, dtype = float)
-            result.append(sp.argmin(temp))
+        result = [sp.argmin(sp.square(x - data1[0][i]).sum(axis = 1, dtype = float)) for i in range(len(data1[1]))]
         return sp.array(result) #1X50000 array
                 
+    def stack(self, n, str_name):
+        '''this function is called by the sub classes to vecctorize
+        func evaluation and gradient evaluation (funcEval etc.) '''
+        temp = sp.vstack((getattr(self, str_name), self.x_temp[n, :]))
+        setattr(self, str_name, temp)
+        
+        
     def funcEval(self, x, data1):
         '''assuming x as a 10X784 matrix and every element in x is a float
         data is a tuple of pixel vectors and its label or what no the vector 
         represent'''
-        fval = sp.zeros(sp.shape(x))
-        for i in range(len(data1[1])):
-            fval[data1[1][i], :] += sp.square(x[data1[1][i], :] - data1[0][i])
-        '''it returns fval vector(10X1)'''
-        return fval.sum(axis = 1, keepdims = True)  #10X1 matrix  
-     
+        self.fn = sp.ones(784) #next two steps are req for calling stack fn
+        self.x_temp = x
+        map(self.stack, data1[1], ['fn' for i in range(len(data1[1]))])
+        self.fn = sp.delete(self.fn, (0), axis=0) #deleting the first row (of ones created above)
+        fval_large = sp.square(self.fn - data1[0]) #DSX784, where DS is dataset size
+        fval_large = fval_large.sum(axis = 1, keepdims = True) #DSX1
+        fval = sn.measurements.sum(fval_large, data1[1], index = [0,1,2,3,4,5,6,7,8,9])
+        fval = sp.reshape(fval, (10,1))
+        return fval        
+#==============================================================================
+#         fval = sp.zeros(sp.shape(x))
+#         for i in range(len(data1[1])):
+#             fval[data1[1][i], :] += sp.square(x[data1[1][i], :] - data1[0][i])
+#         '''it returns fval vector(10X1)'''
+#         return fval.sum(axis = 1, keepdims = True)  #10X1 matrix  
+#==============================================================================
+    def grad_pooling(self, n):
+        '''This will take the large gradient vector's column and add them according 
+        to the index'''
+        idx = [0,1,2,3,4,5,6,7,8,9]
+        temp = sn.measurements.sum(self.grad_vec_l[:,n],self.dat_temp[1],idx)
+        temp1 = sp.reshape(temp, (10,1))
+        self.grad_vec = sp.hstack((self.grad_vec, temp1))
+    
     def gradEval(self, x, data1):
+        #gradient is calculated in a vectorized way
+        '''by calling stack fn we will create a giant matrix of variables that 
+        mirrors the data. Then, we will apply the gradient operation i.e, 2*(w-data).
+        Next, we will call the grad_pooling to add the relevant components; here 
+        stacking is done horizontally (784 components are stacked horizontall to be exact)'''
+        self.dat_temp = data1
         m = float(sp.shape(x)[1]) #no of columns
-        grad_vec = sp.zeros(sp.shape(x)) #grad_vec size will be 10X784
-        for i in range(len(data1[1])):
-            grad_vec[data1[1][i], :] += 2*(x[data1[1][i], :] - data1[0][i])    
+        self.gd = sp.ones(m)
+        self.x_temp = x
+        map(self.stack, data1[1], ['gd' for i in range(len(data1[1]))])
+        self.gd = sp.delete(self.gd, (0), axis=0)#deleting the first row (of ones created above)
+        self.grad_vec_l = 2*(self.gd - data1[0])
+        self.grad_vec = sp.ones((10,1))
+        iter_temp = sp.array([i for i in range(784)])
+        map(self.grad_pooling, iter_temp)
+        self.grad_vec = sp.delete(self.grad_vec, (0), axis=1)
+        
         '''normalizing gradient vector if necessary
         len_vec is a array of length 10 or no of parameters'''
-        len_vec = sp.sqrt(sp.diagonal(sp.dot(grad_vec, sp.transpose(grad_vec))))
+        len_vec = sp.sqrt(sp.diagonal(sp.dot(self.grad_vec, sp.transpose(self.grad_vec))))
         for i in range(len(len_vec)):
             if len_vec[i] > 1000:
-                grad_vec[i,:] = m*grad_vec[i,:]/float(len_vec[i])
-        return grad_vec #10X784 matrix
-        
+                self.grad_vec[i,:] = m*self.grad_vec[i,:]/float(len_vec[i])
+        return self.grad_vec #10X784 matrix        
+#==============================================================================
+#Alternatively it can be written as         
+#        for i in range(len(data1[1])):
+#             grad_vec[data1[1][i], :] += 2*(x[data1[1][i], :] - data1[0][i])    
+#==============================================================================        
         
 class MNISTMultiNom(MNISTClassifierBase):
     
