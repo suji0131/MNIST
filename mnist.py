@@ -118,7 +118,7 @@ class MNISTClassifierBase:
         return stoc_grad
         
     '''stack and grad_pooling are used in sq_loss and multinomial sub classes. They 
-    are used to evaluate func and grad values'''
+    are used to evaluate parts of func and grad values'''
     def stack(self, n, str_name):
         '''gives DSX784 matrix with data as index'''
         '''this function is called by the sub classes to vecctorize
@@ -126,7 +126,7 @@ class MNISTClassifierBase:
         temp = sp.vstack((getattr(self, str_name), self.x_temp[n, :]))
         setattr(self, str_name, temp)
         
-    def grad_pooling(self, n):
+    def grad_pooling(self, n): #consolidates gradient vector
         '''converts DSX784 to 10X784'''
         '''This will take the large gradient vector's column and add them according 
         to the index'''
