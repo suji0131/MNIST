@@ -1,3 +1,4 @@
+#python version 2.7
 import cPickle, gzip
 import scipy as sp
 import matplotlib.pyplot as plt
@@ -116,6 +117,24 @@ class MNISTClassifierBase:
                     stoc_grad[i,:] = stoc_grad[i,:]/(float(m)*float(len_vec[i]))'''
         return stoc_grad
         
+    '''stack and grad_pooling are used in sq_loss and multinomial sub classes. They 
+    are used to evaluate func and grad values'''
+    def stack(self, n, str_name):
+        '''gives DSX784 matrix with data as index'''
+        '''this function is called by the sub classes to vecctorize
+        func evaluation and gradient evaluation (funcEval etc.) acc to data index'''
+        temp = sp.vstack((getattr(self, str_name), self.x_temp[n, :]))
+        setattr(self, str_name, temp)
+        
+    def grad_pooling(self, n):
+        '''converts DSX784 to 10X784'''
+        '''This will take the large gradient vector's column and add them according 
+        to the index'''
+        idx = [0,1,2,3,4,5,6,7,8,9]
+        temp = sn.measurements.sum(self.grad_vec_l[:,n],self.dat_temp[1],idx)
+        temp1 = sp.reshape(temp, (10,1))
+        self.grad_vec = sp.hstack((self.grad_vec, temp1))
+        
     def classify(self, x, data1):
         pass
         
@@ -133,13 +152,7 @@ class MNISTSqloss(MNISTClassifierBase):
         argmin of the array is returned'''
         result = [sp.argmin(sp.square(x - data1[0][i]).sum(axis = 1, dtype = float)) for i in range(len(data1[1]))]
         return sp.array(result) #1X50000 array
-                
-    def stack(self, n, str_name):
-        '''this function is called by the sub classes to vecctorize
-        func evaluation and gradient evaluation (funcEval etc.) '''
-        temp = sp.vstack((getattr(self, str_name), self.x_temp[n, :]))
-        setattr(self, str_name, temp)
-              
+         
     def funcEval(self, x, data1):
         '''assuming x as a 10X784 matrix and every element in x is a float
         data is a tuple of pixel vectors and its label or what no the vector 
@@ -160,13 +173,6 @@ class MNISTSqloss(MNISTClassifierBase):
 #         '''it returns fval vector(10X1)'''
 #         return fval.sum(axis = 1, keepdims = True)  #10X1 matrix  
 #==============================================================================
-    def grad_pooling(self, n):
-        '''This will take the large gradient vector's column and add them according 
-        to the index'''
-        idx = [0,1,2,3,4,5,6,7,8,9]
-        temp = sn.measurements.sum(self.grad_vec_l[:,n],self.dat_temp[1],idx)
-        temp1 = sp.reshape(temp, (10,1))
-        self.grad_vec = sp.hstack((self.grad_vec, temp1))
     
     def gradEval(self, x, data1):
         #gradient is calculated in a vectorized way
@@ -192,50 +198,95 @@ class MNISTSqloss(MNISTClassifierBase):
         for i in range(len(len_vec)):
             if len_vec[i] > 1000:
                 self.grad_vec[i,:] = m*self.grad_vec[i,:]/float(len_vec[i])
-        return self.grad_vec #10X784 matrix        
+        return self.grad_vec #10X784 matrix
+        
 #==============================================================================
 #Alternatively it can be written as         
 #        for i in range(len(data1[1])):
 #             grad_vec[data1[1][i], :] += 2*(x[data1[1][i], :] - data1[0][i])    
-#==============================================================================        
+#==============================================================================
+        
         
 class MNISTMultiNom(MNISTClassifierBase):
     
     def classify(self, x, data1):
         '''for a point at every learned vector we will calculate the probability
         whichever is max(argmax) that index is assigned to the data point'''
-        result = []
-        for i in range(len(data1[1])):
-            temp = sp.exp((x*data1[0][i]).sum(axis =1, keepdims = True))
-            result.append(sp.argmax(temp))
+        result = [sp.argmax(sp.exp((x*data1[0][i]).sum(axis =1, keepdims = True))) for i in range(len(data1[1]))]
         return sp.array(result)  #1X50000 array
         
-    def funcEval(self, x, data1):  
-        fval = sp.zeros((int(sp.shape(x)[0]), 1))
-        for i in range(len(data1[1])):
-            '''wa is a scalar of wa, w(row) size is 1X784 and aT size is 784X1'''
-            wa = sp.sum(x[data1[1][i], :]*(data1[0][i]))
-            '''swa is a vector of 10X1 w is matrix of 10X784 and aT size is 784X1'''
-            swa = (x*(data1[0][i])).sum(axis = 1, keepdims = True)
-            fval[data1[1][i]] += sp.log(sp.sum(sp.exp(swa))) - wa
-        return fval  #10X1 matrix
+    def secondpart(self, n):
+        '''this fn calc the "sum" of exponentials in the multinomial fn'''
+        temp = self.x_temp[n,:]*self.dat_temp[0]
+        if self.fn2 == None:
+            self.fn2 = sp.exp(temp.sum(axis=1, keepdims=True))
+        else:
+            self.fn2 += sp.exp(temp.sum(axis=1, keepdims=True))
         
-    def gradEval_behind( self, anarray):
-        multiplied_array=sp.exp(sp.sum(self.y * anarray, axis=1))
-        numerator=multiplied_array[self.i]
-        denominator = sp.sum(multiplied_array)
-        return numerator/denominator*anarray
+    def funcEval(self, x, data1):
+        '''assuming x as a 10X784 matrix and every element in x is a float
+        data is a tuple of pixel vectors and its label or what no the vector 
+        represent'''
+        '''second or logarithm part of function is calc by taking log of secondpart fn
+        return value. First part is calc with in this fn itself.'''
+        #every thing is vectorized to calc fn value.
+        self.x_temp = x
+        self.dat_temp = data1
+        self.fn2 = None
+        map(self.secondpart, [i for i in range(10)])
+        fn2_log = sp.log(self.fn2)
+        
+        #fn_stacked creates first parts w's
+        self.fn_stacked = sp.ones(784) #next two steps are req for calling stack fn
+        map(self.stack, data1[1], ['fn_stacked' for i in range(len(data1[1]))])
+        self.fn_stacked = sp.delete(self.fn_stacked, (0), axis=0) #deleting the first row (of ones created above)
+        fn1_temp = self.fn_stacked*self.dat_temp[0]
+        fn1 = fn1_temp.sum(axis=1, keepdims=True)
+        
+        self.fval_long = -1*fn1 + fn2_log
+        
+        idx = [0,1,2,3,4,5,6,7,8,9]
+        fval = sn.measurements.sum(self.fval_long,self.dat_temp[1],idx)
+        fval = sp.reshape(fval, (10,1))
+        
+        return fval #10X1 matrix
+        
+#==============================================================================
+#         fval = sp.zeros((int(sp.shape(x)[0]), 1))
+#         for i in range(len(data1[1])):
+#             '''wa is a scalar of wa, w(row) size is 1X784 and aT size is 784X1'''
+#             wa = sp.sum(x[data1[1][i], :]*(data1[0][i]))
+#             '''swa is a vector of 10X1 w is matrix of 10X784 and aT size is 784X1'''
+#             swa = (x*(data1[0][i])).sum(axis = 1, keepdims = True)
+#             fval[data1[1][i]] += sp.log(sp.sum(sp.exp(swa))) - wa
+#         return fval  #10X1 matrix
+#==============================================================================
 
-    def gradEval(self, x, data):
-        self.y=x
-        grad = []
-        for i in range(0,10):
-            self.i = i
-            scalar1 = sp.sum(data[0][data[1] == i],axis=0)
-            scalar2 = sp.sum(sp.apply_along_axis(self.gradEval_behind,1,data[0]),axis=0)
-            grad.append(scalar2 - scalar1)
-        grad_vec =  sp.array(grad).reshape((10,784)) 
-        return grad_vec #10X784 matrix
+    def gradEval(self, x, data1):
+        '''gradient form is negative for the form shown in the image'''
+        self.x_temp = x
+        self.dat_temp = data1
+        self.fn2 = None
+        map(self.secondpart, [i for i in range(10)])
+        gd2b = self.fn2 #DSX1
+        
+        #fn_stacked creates first parts w's
+        self.gd_stacked = sp.ones(784) #next two steps are req for calling stack fn
+        map(self.stack, data1[1], ['gd_stacked' for i in range(len(data1[1]))])
+        self.gd_stacked = sp.delete(self.gd_stacked, (0), axis=0) #deleting the first row (of ones created above)
+        
+        gd2a1 = self.gd_stacked*self.dat_temp[0]
+        gd2a = sp.exp(gd2a1.sum(axis=1, keepdims=True)) #DSX1
+        
+        temp = sp.divide(gd2a, gd2b) * self.dat_temp[0]
+        
+        self.grad_vec_l = -1*self.dat_temp[0] + temp
+        
+        self.grad_vec = sp.ones((10,1))
+        iter_temp = sp.array([i for i in range(784)])
+        map(self.grad_pooling, iter_temp)
+        self.grad_vec = sp.delete(self.grad_vec, (0), axis=1)
+        return self.grad_vec
         
 class SGD:
     def __init__(self, afunc, x0, inistepsize, gamm, proj=None, histsize=-1, smallhist=False, ndata = 100, keepobj = True):
